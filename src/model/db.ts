@@ -4,7 +4,7 @@ import { Connection } from 'mysql2/promise';
 var connection = mysql.createConnection({
     host     : '127.0.0.1',
     user     : 'root',
-    password : '',
+    password : 'chollima',
     database : 'chat'
 });
 

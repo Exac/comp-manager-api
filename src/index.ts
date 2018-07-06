@@ -15,23 +15,23 @@ let LocalStrategy = require('passport-local').Strategy;
  */
 const localStrategy = new LocalStrategy({ usernameField: 'email', session: false, passReqToCallback: true }, function (req, username, password, done) {
 
-  console.log(`LocalStrategy(req, username=${username}, password=${password}, done() )`)
+  // console.log(`LocalStrategy(req, username=${username}, password=${password}, done() )`)
   return co(function* () {
-      console.log(`LocalStrategy() -> reqCo=${req.isAuthenticated()}`)
+      // console.log(`LocalStrategy() -> reqCo=${req.isAuthenticated()}`)
       try {
           let result: any = yield Promise.resolve(User.authenticate(username, password));
-          console.log(`LocalStrategy() -> result=${JSON.stringify(result)}`)
+          // console.log(`LocalStrategy() -> result=${JSON.stringify(result)}`)
           if (result.user) {
-              console.log(`LocalStrategy() -> user=${JSON.stringify(result.user)}`)
-              console.log(`LocalStrategy() -> reqU=${req.isAuthenticated()}`)
+              // console.log(`LocalStrategy() -> user=${JSON.stringify(result.user)}`)
+              // console.log(`LocalStrategy() -> reqU=${req.isAuthenticated()}`)
               return done(null, result.user)
           } else {
-              console.log(`LocalStrategy() -> couldn't match username and password to user`)
-              console.log(`LocalStrategy() -> reqE=${req.isAuthenticated()}`)
+              // console.log(`LocalStrategy() -> couldn't match username and password to user`)
+              // console.log(`LocalStrategy() -> reqE=${req.isAuthenticated()}`)
               return done(null, false)
           }
       } catch (error) {
-          console.log(`error in new LocalStrategy, error: ${JSON.stringify(error)}`)
+          // console.log(`error in new LocalStrategy, error: ${JSON.stringify(error)}`)
           return done(false)
       }
   });
@@ -39,20 +39,20 @@ const localStrategy = new LocalStrategy({ usernameField: 'email', session: false
 
 
 passport.serializeUser(function (user: IUser, done) {
-  console.log(`serializeUser(user=${JSON.stringify(user)})`)
+  // console.log(`serializeUser(user=${JSON.stringify(user)})`)
   done(null, user.id);
 });
 
 passport.deserializeUser(function (id: number, done) {
-  console.log(`deserializeUser(id=${id})`)
+  // console.log(`deserializeUser(id=${id})`)
   return co(function* () {
       try {
           let user = yield Promise.resolve(User.get(id));
-          console.log(`deserializeUser() -> user=${JSON.stringify(user)}`)
+          // console.log(`deserializeUser() -> user=${JSON.stringify(user)}`)
           if (!user) { return done(null, false) }
           done(null, user)
       } catch (error) {
-          console.log(`u=(error)${error}`)
+          // console.log(`u=(error)${error}`)
           done(error)
       }
   })
@@ -79,7 +79,7 @@ const app = express();
 
 // MySQL
 const MySQLStore = require('express-mysql-session')(session)
-const db = { host: "127.0.0.1", user: "root", password: "", database: "users" };
+const db = { host: "127.0.0.1", user: "root", password: "chollima", database: "users" };
 const sessionStore = new MySQLStore(db);
 
 // Init body parsing middleware

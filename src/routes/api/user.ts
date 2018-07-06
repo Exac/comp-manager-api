@@ -1,22 +1,16 @@
 import * as express from 'express';
 import * as bodyParser from 'body-parser';
 import * as Entities from 'html-entities';
-import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import * as nodemailer from 'nodemailer';
-import * as session from 'express-session';
-import { v4 as uuid } from 'uuid';
 import { User } from '../../model/user';
-import * as mysql2 from 'mysql2/promise';
 import { Connection } from 'mysql2/promise';
-const MySQLStore = require('express-mysql-session')(session)
-let passport = require('passport')
-let LocalStrategy = require('passport-local').Strategy;
+
 /**
  * SETTINGS
  */
 const router = express.Router();
-const db = { host: "127.0.0.1", user: "root", password: "", database: "users" };
+const db = { host: "127.0.0.1", user: "root", password: "chollima", database: "users" };
 // const sessionStore = new MySQLStore(db);
 const jsonParser = bodyParser.json(); // for parsing POST/PUT/DELETE json requests
 const urlEncodedParser = bodyParser.urlencoded({ extended: false }); // and parsing normal form requests
@@ -43,22 +37,9 @@ let connection: Connection;
     }
 })()
 
-// router.use(session({
-//     genid: function (req) {
-//         return uuid();
-//     },
-//     secret: 'bbzgbxjktgfeacwmsycpquyxovfukhsg', // secret used to generate hash
-//     store: sessionStore,
-//     resave: false,
-//     saveUninitialized: true
-// }))
-
 /**
  * ROUTES FOR /api/user/*
  */
-
-
-
 router.post('/', jsonParser, async function (req, res) {
     // remove HTML chars from alias
     req.body.alias = new Entities.AllHtmlEntities().encode(req.body.alias);
@@ -83,9 +64,23 @@ router.get('/email/:userid', async function (req, res) {
     await User.getEmail(req.params.userid)
         .then(result => { email = result })
         .catch((err) => {
-            return (res.headersSent) ? null : res.json({ 'email': 'error' });
+            return (res.headersSent) ? null : res.json({ 'email': err });
         })
     return (res.headersSent) ? null : res.json({ 'alias': email })
+});
+
+router.get('/email/:email/exists', async function (req, res) {
+    await User.existsEmail(req.params.email)
+        .then(result => { return res.send(true) })
+        .catch(error => { return res.send(false) })
+    return res.send(false)
+});
+
+router.get('/alias/:alias/exists', async function (req, res) {
+    await User.existsAlias(req.params.alias)
+        .then(result => { return res.send(true) })
+        .catch(error => { return res.send(false) })
+    return res.send(false)
 });
 
 router.put('/password/', jsonParser, async function (req, res, next) {
@@ -110,7 +105,7 @@ router.put('/password/', jsonParser, async function (req, res, next) {
 
 router.get('/logout', async function (req, res) {
     // user wants to log out
-    req.session.data = {};
+    req.logout();
     return res.json({ 'success': true });
 })
 
@@ -174,13 +169,17 @@ router.post('/forgot/', jsonParser, async function (req, res, next) {
             + `Please ignore this message if you don't know what Chollima is, or if you do not `
             + `have an account with us.`
             + `\nTo reset your password, please follow the following link:`
-            + `\n\n${req.protocol}://${req.get("host")}/login/recovery/?id=${id}&recovery=${recovery}`
+            + `\n\n${req.protocol}://${req.get("host")}/login/recovery/?id=${id}`
+            + `&recovery=${recovery}`
             + `\n\nThe recovery link is valid for 4 hours.`,
         html: `<p>Hello, this is an automated message from Chollima.</p>\n`
             + `<p>We recieved a request to reset your account's password just now.</p>\n`
-            + `<p>Please ignore this message if you don't know what Chollima is, or if you do not have an account with us.</p>\n`
+            + `<p>Please ignore this message if you don't know what Chollima is, or if you do not `
+            + `have an account with us.</p>\n`
             + `<p>To reset your password, please follow the following link:</p>\n`
-            + `<br><p>< href="${req.protocol}://${req.get("host")}/login/recovery/?id=${id}&recovery=${recovery}">${req.protocol}://${req.get("host")}/login/recovery/?id=${id}&recovery=${recovery}</a></p>\n`
+            + `<br><p>< href="${req.protocol}://${req.get("host")}/login/recovery/?id=${id}`
+            + `&recovery=${recovery}">${req.protocol}://${req.get("host")}/login/recovery/?id=${id}`
+            + `&recovery=${recovery}</a></p>\n`
             + `<br><p>The recovery link is valid for 4 hours.</p>\n`
     };
 

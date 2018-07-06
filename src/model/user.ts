@@ -142,12 +142,10 @@ export class User implements IUser {
         let hash = await bcrypt.hash(password, salt)
             .catch((err) => { return Promise.reject(`Unable to hash password.`) });
         // update password in database
-        let query = 'UPDATE `users` SET `password` = ?, `salt` = ? WHERE `id` = ?';
+        let query = 'UPDATE `users` SET `password` = ? WHERE `id` = ?';
         let [rows, fields] = await User.connection.execute<mysql2.RowDataPacket[]>(
-            query, [hash, salt, this.id])
+            query, [hash, this.id])
             .catch((err) => { return Promise.reject(`Couldn't connect to database.`) });
-        // Technically the salt is stored as the first 29 characters of the password hash,
-        // storing it makes it easier to switch to another hashing algorithm if needed.
         return true
     }
 
@@ -176,8 +174,8 @@ export class User implements IUser {
         })
         // store the recovery key, hash, and expiry date in the database
         const expirydate = new Date(Date.now() + 1000 * 60 * 60 * 4); // 4 hours
-        let query = 'UPDATE `users` SET `recovery` = ?, `recoverysalt` = ?, `recoveryexpire` = ? WHERE `id` = ?'
-        let [_rows, _fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [_hash, _salt, expirydate, this.id])
+        let query = 'UPDATE `users` SET `recovery` = ?, `recoveryexpire` = ? WHERE `id` = ?'
+        let [_rows, _fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [_hash, expirydate, this.id])
             .catch(err => { return Promise.reject(`Couldn't connect to database.`) })
 
         return true
@@ -226,11 +224,11 @@ export class User implements IUser {
         let hash: string | void = await bcrypt.hash(password, salt).catch((e) => { });
         // create account
         query = (typeof id !== 'undefined')
-            ? "INSERT INTO `users` (id, email, alias, password, salt) VALUES(?, ?, ?, ?, ?)"
-            : "INSERT INTO `users` (email, alias, password, salt) VALUES(?, ?, ?, ?)";
+            ? "INSERT INTO `users` (id, email, alias, password) VALUES(?, ?, ?, ?)"
+            : "INSERT INTO `users` (email, alias, password) VALUES(?, ?, ?)";
         let _params: any[] = (typeof id !== 'undefined')
-            ? [id, email, alias, hash, salt]
-            : [email, alias, hash, salt];
+            ? [id, email, alias, hash]
+            : [email, alias, hash];
         let [_rows, _fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, _params)
             .catch(error => { return Promise.reject(`Couldn't connect to database.`) })
         return true
@@ -309,6 +307,28 @@ export class User implements IUser {
             return Promise.reject(`User (id:${id} does not exist.`)
         }
         return rows[0]['email']
+    }
+
+    public static async existsEmail(email: string) : Promise<boolean> {
+        await User.dbConnect()
+        let query = 'SELECT id FROM `users` WHERE email = ? LIMIT 1'
+        let [rows, fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [email])
+            .catch((e) => { return Promise.reject(`Couldn't connect to database.`); })
+        if (rows.length < 1) {
+            return Promise.reject(`User (email:${email} does not exist.`)
+        }
+        return true;
+    }
+
+    public static async existsAlias(alias: string) : Promise<boolean> {
+        await User.dbConnect()
+        let query = 'SELECT id FROM `users` WHERE alias = ? LIMIT 1'
+        let [rows, fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [alias])
+            .catch((e) => { return Promise.reject(`Couldn't connect to database.`); })
+        if (rows.length < 1) {
+            return Promise.reject(`User (alias:${alias} does not exist.`)
+        }
+        return true;
     }
 
     /**
@@ -424,7 +444,7 @@ export class User implements IUser {
         if (typeof User.connection === 'undefined') {
             try {
                 User.connection = await mysql2.createConnection(
-                    { host: "127.0.0.1", user: "root", password: "", database: "users" })
+                    { host: "127.0.0.1", user: "root", password: "chollima", database: "users" })
                     .then(connection => {
                         // console.log('dbConnect(): connected @ ', new Date(Date.now()).getMilliseconds())
                         return connection;
@@ -468,7 +488,7 @@ export class User implements IUser {
         let _hash = await bcrypt.hash(recovery, _salt).catch(err => { return { 'success': false, message: `Couldn't hash password.` } })
         // These should have already been taken care of in the call to setRecovery...
         const expirydate = new Date(Date.now() + 1000 * 60 * 60 * 4); // 4 hours // store the recovery key in database
-        await User.connection.execute('UPDATE `users` SET `recovery` = ?, `recoverysalt` = ?, `recoveryexpire` = ? WHERE `id` = ?', [_hash, _salt, expirydate, id])
+        await User.connection.execute('UPDATE `users` SET `recovery` = ?, `recoveryexpire` = ? WHERE `id` = ?', [_hash, expirydate, id])
             .catch(err => { return { 'success': false, message: `Recovery email sent, database failure.` } })
         return { 'success': true, message: `Recovery email sent to ${message.to}. Click the link to reset your password.` }
     }
