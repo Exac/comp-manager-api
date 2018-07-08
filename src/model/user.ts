@@ -1,36 +1,19 @@
-import * as mysql2 from 'mysql2/promise';
-import { Connection } from 'mysql2/promise';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import * as nodemailer from 'nodemailer';
 import * as Entities from 'html-entities';
 import { AllHtmlEntities } from 'html-entities';
+import db from './db'
 
 export class User implements IUser {
     public id: number;
     public alias: string;
     public email: string;
 
-    public static connection: Connection; // connection to user database
     private static encoder: AllHtmlEntities = new Entities.AllHtmlEntities();
 
     constructor() {
-        // Connect to MySQL database
-        if (typeof User.connection === 'undefined') {
-            console.log('model/user');
-            User.connection = <Connection>{};
-            (async function () {
-                try {
-                    await User.dbConnect()
-                        .then(re => { console.log('!*database connected*!') })
-                } catch (err) {
-                    console.log(`model/user.ts constructor anonymous async connection error: ${err}`);
-                    throw err;
-                }
-            })
-        } else {
-            // connection has already been defined
-        }
+
     }
 
     public getId(): number {
@@ -47,106 +30,134 @@ export class User implements IUser {
 
     public async getPassword(): Promise<string> {
         if (!User.validateId(this.id)) { return Promise.reject(`Invalid user id: ${this.id}`) }
-        let query = 'SELECT id,password FROM `users` where `id` = ?'
-        let [rows, fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [this.id])
-            .catch(error => { return Promise.reject(`Couldn't connect to database.`) })
-        if (rows.length < 1) {
-            return Promise.reject(`No password set for user with id: ${this.id}`)
-        }
-        return <string>rows[0].password;
+        let query = 'SELECT id,password FROM users where user_id = $1'
+        await db.one(query, [this.id])
+            .then(row => {
+                return <string>row.password;
+            })
+            .catch(err => {
+                return Promise.reject(`No password set for user with id: ${this.id}`)
+            })
     }
 
     public async getRecovery(): Promise<string> {
         if (!User.validateId(this.id)) { return Promise.reject(`Invalid user id: ${this.id}`) }
-        let query = 'SELECT recovery FROM `users` where `id` = ?'
-        console.log(`connection: ${User.connection}`)
-        let [rows, fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [this.id])
-            .catch(error => { return Promise.reject(`Couldn't connect to database.`) })
-        if (rows.length < 1 || !rows[0].recovery) {
-            return Promise.reject(`No recovery set for user with id: ${this.id}`)
-        }
-        return <string>rows[0].recovery;
+        let query = 'SELECT recovery FROM users where user_id = $1'
+        await db.one(query, [this.id])
+            .then(row => {
+                return <string>row.recovery;
+            })
+            .catch(err => {
+                return Promise.reject(`No recovery set for user with id: ${this.id}`)
+            })
     }
 
     public async getRecoveryExpire(): Promise<Date> {
         if (!User.validateId(this.id)) { return Promise.reject(`Invalid user id: ${this.id}`) }
-        let query = 'SELECT recoveryexpire FROM `users` where `id` = ?'
-        let [rows, fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [this.id])
-            .catch(error => { return Promise.reject(`Couldn't connect to database.`) })
-        if (rows.length < 1 || typeof rows[0].recoveryexpire === 'undefined') {
-            return Promise.reject(`No recoveryexpire set for user id:${this.id}`)
-        }
-        return Promise.resolve(new Date(rows[0].recoveryexpire));
+        let recoveryExpire: Date;
+        let query = 'SELECT recovery_expire FROM users where user_id = $1'
+        await db.one(query, [this.id])
+            .then(row => {
+                if (typeof row.recovery_expire === 'undefined') {
+                    return Promise.reject(`No recovery_expire set for user id:${this.id}`)
+                }
+                recoveryExpire = new Date(row.recovery_expire)
+            })
+            .catch(err => {
+                return Promise.reject(`Couldn't connect to database.`)
+            })
+        return recoveryExpire
     }
 
     public async setId(id?: number): Promise<boolean> {
         if (!User.validateId(id)) { return Promise.reject(`Invalid user id: ${id}`) }
+        if (!User.validateId(this.id)) { return Promise.reject(`Invalid user id on this.user: ${id}`) }
         // check if id already exists in database
-        let query = "SELECT id FROM `users` WHERE `id` = ?";
-        let [rows, fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [id])
-            .catch(error => { return Promise.reject(`Couldn't connect to database.`) })
-        if (rows.length > 0) {
-            return Promise.reject(`A user already has id: ${id}`)
-        }
+        let query = "SELECT user_id FROM users WHERE user_id = $1";
+        await db.any(query, id)
+            .then(rows => {
+                if (rows.length > 0) {
+                    return Promise.reject(`A user already has id: ${id}`)
+                }
+            })
+            .catch(err => {
+                return Promise.reject(`Couldn't connect to database.`)
+            })
         // change id in database
-        query = 'UPDATE users SET `id` = ? WHERE `id` = ?';
-        let [r, f] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [id, this.id])
-            .catch(error => { return Promise.reject(`Couldn't connect to database.`) })
-        // update this
-        this.id = id;
-        return true
+        query = 'UPDATE users SET user_id = $1 WHERE user_id = $2';
+        await db.none(query, [id, this.id])
+            .then(res => {
+                // update `this`
+                this.id = id
+            })
+            .catch(err => { return Promise.reject(`Couldn't connect to database.`) })
+        return Promise.resolve(true)
     }
 
     public async setAlias(alias: string): Promise<boolean> {
         if (!User.validateAlias(alias)) { return Promise.reject(`Invalid user alias: ${alias}`) }
+        if (!User.validateId(this.id)) { return Promise.reject(`Invalid user id on this.user: ${this.alias}`) }
         // check if alias already exists in database
-        let query = "SELECT id, alias FROM `users` WHERE `alias` = ?";
-        let [rows, fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [alias])
-            .catch(error => { return Promise.reject(`Couldn't connect to database.`) })
-        if (rows.length > 0) {
-            // user with this alias already exists, so reject
-            return Promise.reject(`A user already has alias: ${alias}`)
-        }
+        let query = "SELECT user_id, alias FROM users WHERE alias = $1";
+        await db.any(query, alias)
+            .then(rows => {
+                if (rows.length > 0) {
+                    return Promise.reject(`A user already has alias: ${alias}`)
+                }
+            })
+            .catch(err => {
+                return Promise.reject(`Couldn't connect to database.`)
+            })
         // change alias in database
-        query = 'UPDATE users SET `alias` = ? WHERE `id` = ?';
-        let [r, f] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [alias, this.id])
-            .catch(error => { return Promise.reject(`Couldn't connect to database.`) })
-        // update this
-        this.alias = alias;
-        return true
+        query = 'UPDATE users SET alias = $1 WHERE user_id = $2';
+        await db.none(query, [alias, this.id])
+            .then(res => {
+                // update `this`
+                this.alias = alias
+                return Promise.resolve(true)
+            })
+            .catch(err => { return Promise.reject(`Couldn't connect to database.`) })
     }
 
     public async setEmail(email: string): Promise<boolean> {
         if (!User.validateEmail(email)) { return Promise.reject(`Invalid user email: ${email}`) }
+        if (!User.validateId(this.id)) { return Promise.reject(`Invalid user id on this.user: ${this.email}`) }
         // check if email already exists in database
-        let query = "SELECT id, email FROM `users` WHERE `email` = ?";
-        let [rows, fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [email])
-            .catch(error => { return Promise.reject(`Couldn't connect to database.`) })
-        if (rows.length > 0) {
-            // user with this email already exists, so reject
-            return Promise.reject(`${email} is already registered by a user`)
-        }
+        let query = "SELECT user_id, email FROM users WHERE email = $1";
+        await db.any(query, email)
+            .then(rows => {
+                if (rows.length > 0) { // TODO: this will never be called? it'll respond with user_id=null MAYBE??
+                    return Promise.reject(`A user already has email: ${email}`)
+                }
+            })
+            .catch(err => {
+                return Promise.reject(`Couldn't connect to database.`)
+            })
         // change email in database
-        query = 'UPDATE users SET `email` = ? WHERE `id` = ?';
-        let [r, f] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [email, this.id])
-            .catch(error => { return Promise.reject(`Couldn't connect to database.`) })
-        // update this
-        this.email = email;
-        return true
+        query = 'UPDATE users SET email = $1 WHERE user_id = $2';
+        await db.none(query, [email, this.id])
+            .then(res => {
+                // update `this`
+                this.email = email
+                return Promise.resolve(true)
+            })
+            .catch(err => { return Promise.reject(`Couldn't connect to database.`) })
     }
 
     public async setPassword(password: string): Promise<boolean> {
         if (!User.validatePassword(password)) { return Promise.reject(`Invalid user password: ${'*'.repeat(password.length)}}`) }
         // generate salt & hash
-        let salt = bcrypt.genSaltSync(4);
+        let salt = bcrypt.genSaltSync(4); console.log('salt', salt)
         let hash = await bcrypt.hash(password, salt)
             .catch((err) => { return Promise.reject(`Unable to hash password.`) });
         // update password in database
-        let query = 'UPDATE `users` SET `password` = ? WHERE `id` = ?';
-        let [rows, fields] = await User.connection.execute<mysql2.RowDataPacket[]>(
-            query, [hash, this.id])
-            .catch((err) => { return Promise.reject(`Couldn't connect to database.`) });
-        return true
+        let query = 'UPDATE users SET password = $1 WHERE user_id = $2';
+        await db.none(query, [hash, this.id])
+            .then(res => { })
+            .catch(err => {
+                return Promise.reject(`Couldn't connect to database. ${err.message}`)
+            })
+        return Promise.resolve(true)
     }
 
     public async setRecovery(recovery?: string): Promise<boolean> {
@@ -174,31 +185,34 @@ export class User implements IUser {
         })
         // store the recovery key, hash, and expiry date in the database
         const expirydate = new Date(Date.now() + 1000 * 60 * 60 * 4); // 4 hours
-        let query = 'UPDATE `users` SET `recovery` = ?, `recoveryexpire` = ? WHERE `id` = ?'
-        let [_rows, _fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [_hash, expirydate, this.id])
+        let query = 'UPDATE users SET recovery = $1, recovery_expire = $2 WHERE user_id = $3'
+        await db.none(query, [_hash, expirydate, this.id])
             .catch(err => { return Promise.reject(`Couldn't connect to database.`) })
-
-        return true
+        return Promise.resolve(true)
     }
 
-    public async isValidRecovery(id: number, recovery: string): Promise<boolean> {
-        let query = "SELECT recovery, recoveryexpire FROM `users` where id = ?"
-        let [rows, fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [id])
-            .catch((err) => { return Promise.reject(`Couldn't connect to database.`) });
-        if (rows.length < 1) {
-            return Promise.reject(`user id: ${id} not found in database`)
-        }
-        // check if hash matches
-        if (!bcrypt.compareSync(recovery, rows[0].recovery)) {
-            return Promise.reject(`Recovery key validation failed.`)
-        }
-        // check if recovery code has expired
-        let expiry = new Date(rows[0].recoverexpiry)
-        let now = new Date(Date.now());
-        if (expiry < now) {
-            return Promise.reject(`Recovery key expired`)
-        }
-        return true;
+    public async isValidRecovery(recovery: string, id: number): Promise<boolean> {
+        if (typeof recovery === 'undefined' || recovery === '') { return Promise.reject(`Invalid recovery: ${recovery}`) }
+        let query = "SELECT recovery, recovery_expire FROM users where user_id = $1"
+        await db.one(query, [id])
+            .then((row: any) => {
+                console.log('iVR() res:', row, row[0])
+                if (row.recovery === null || row.recovery_expire === null) {
+                    return Promise.reject(`No recovery key set for user with user_id: ${id}`)
+                }
+                // check if hash matches
+                if (!bcrypt.compareSync(recovery, row.recovery)) {
+                    return Promise.reject(`Recovery key validation failed.`)
+                }
+                // check if recovery code has expired
+                let expiry = new Date(row.recover_expiry)
+                let now = new Date(Date.now());
+                if (expiry < now) {
+                    return Promise.reject(`Recovery key expired`)
+                }
+            })
+            .catch((err) => { return Promise.reject(err) });
+        return Promise.resolve(true);
     }
 
     public static async set(alias: string, email: string, password: string, id?: number): Promise<boolean> {
@@ -209,28 +223,30 @@ export class User implements IUser {
         if (!User.validatePassword(password)) { return Promise.reject(`Invalid password: ${password}`); }
         // check uniqness of keys
         let query: string = (typeof id !== 'undefined')
-            ? "SELECT * FROM `users` WHERE `id` = ? OR `alias` = ? OR `email` = ?"
-            : "SELECT * FROM `users` WHERE `alias` = ? OR `email` = ?";
+            ? "SELECT * FROM users WHERE user_id = $1 OR alias = $2 OR email = $3"
+            : "SELECT * FROM users WHERE alias = $1 OR email = $2";
         let params: any[] = (typeof id !== 'undefined')
             ? [id, alias, email]
             : [alias, email];
-        let [rows, fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, params)
-            .catch(error => { return Promise.reject(`Couldn't connect to database.`) })
-        if (rows.length > 0) {
-            return Promise.reject(`Account alias and email must be unique.`)
-        }
+        await db.oneOrNone(query, params)
+            .then(res => {
+                // user already exists in db, we won't be able to set the supplied user
+                if (res) { return Promise.reject(`Account alias and email must be unique.`) }
+            })
+            .catch(err => { return Promise.reject(`Couldn't connect to database. ${err}`) })
         // create password hash & salt
         let salt: string | void = bcrypt.genSaltSync(4);
         let hash: string | void = await bcrypt.hash(password, salt).catch((e) => { });
         // create account
         query = (typeof id !== 'undefined')
-            ? "INSERT INTO `users` (id, email, alias, password) VALUES(?, ?, ?, ?)"
-            : "INSERT INTO `users` (email, alias, password) VALUES(?, ?, ?)";
+            ? "INSERT INTO users (user_id, email, alias, password) VALUES($1, $2, $3, $4)"
+            : "INSERT INTO users (email, alias, password) VALUES($1, $2, $3)";
         let _params: any[] = (typeof id !== 'undefined')
             ? [id, email, alias, hash]
             : [email, alias, hash];
-        let [_rows, _fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, _params)
-            .catch(error => { return Promise.reject(`Couldn't connect to database.`) })
+            console.log(query, _params)
+        await db.none(query, _params)
+            .catch(error => { return Promise.reject(`Couldn't connect to database. ${error}`) })
         return true
     }
 
@@ -244,91 +260,94 @@ export class User implements IUser {
         let query: string;
         let params: any[] = [identifier]
         let key: string;
+        let _password: string;
         // Users have three keys: id, alias, or email. See which one is used.
-        key = typeof identifier === 'number' ? 'id' : identifier.includes('@') ? 'email' : 'alias';
-        query = 'SELECT id, alias, email, password FROM `users` where `' + key + '` = ? LIMIT 1'
-        let [rows, fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, params)
-            .catch(error => { return Promise.reject(`Couldn't connect to database.`) })
-        u.id = rows[0].id;
-        u.alias = rows[0].alias;
-        u.email = rows[0].email;
+        key = typeof identifier === 'number' ? 'user_id' : identifier.includes('@') ? 'email' : 'alias';
+        query = `SELECT user_id, alias, email, password FROM users where ${key} = $1 LIMIT 1`
+        await db.oneOrNone(query, params)
+            .then((row) => {
+                if (!row) {
+                    return Promise.reject(`User (identifier:${identifier}) does not exist.`)
+                }
+                u.id = row.user_id;
+                u.alias = row.alias;
+                u.email = row.email;
+                _password = row.password;
+            })
+            .catch(err => {
+                return Promise.reject(`${err}`)
+            })
         // err if password is incorrect
         if (password != null) {
-            let valid = await bcrypt.compare(password, rows[0].password)
-                .catch(e => { /* bcrypt error */return Promise.reject(false); });
-            return valid ? u : Promise.reject(false);
+            let valid = bcrypt.compareSync(password, _password)
+            return valid ? Promise.resolve(u) : Promise.reject(false)
         }
+
         return u;
     }
 
     public static async getId(email: string): Promise<number> {
-        // connect to MySQL database first
-        await User.dbConnect();
         // ensure email is valid
         if (!User.validateEmail(email)) {
             return Promise.reject('Invalid email');
         }
         // find id in database
-        let query = 'SELECT id FROM `users` WHERE email = ? LIMIT 1';
-        let [rows, fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [email])
-            .catch(e => { return Promise.reject(`Couldn't connect to database.`) });
-        // reject if results empty
-        if (rows.length < 1) {
-            return Promise.reject(`User (email:${email}) does not exist.`)
-        }
-        console.log(`static async getId(${email}) => ${rows[0].id}. rows:${rows}`)
-        // return the id
-        return parseInt(rows[0].id)
+        let query = 'SELECT user_id FROM users WHERE email = $1 LIMIT 1';
+        let id: number;
+        return await db.oneOrNone(query, email)
+            .then(row => {
+                // reject if results empty
+                return row ? row : Promise.reject(`User (email:${email}) does not exist.`)
+            })
+            .then(row => {
+                return parseInt(row.user_id)
+            })
+            .catch(e => { return Promise.reject(`${e}`) })
     }
 
     public static async getAlias(id: number): Promise<string> {
-        await User.dbConnect();
+        // ensure user_id is valid
         if (!User.validateId(id)) {
             return Promise.reject('Invalid id');
         }
-        let query = 'SELECT alias FROM `users` WHERE id = ? LIMIT 1'
-        let [rows, fields] = await this.connection.execute<mysql2.RowDataPacket[]>(query, [id])
-            .catch((e) => { return Promise.reject(`Couldn't connect to database.`); })
-        if (rows.length < 1) {
-            return Promise.reject(`User (id:${id}) does not exist.`)
-        }
-        return rows[0]['alias'];
+        let query = 'SELECT alias FROM users WHERE user_id = $1 LIMIT 1'
+        return await db.oneOrNone(query, [id])
+            .then(row => {
+                if (!row) { return Promise.reject(`User (id:${id}) does not exist.`) }
+                return row.alias
+            })
+            .catch((e) => { return Promise.reject(`${e}`); })
     }
 
     public static async getEmail(id: number): Promise<string> {
-        await User.dbConnect();
         if (!User.validateId(id)) {
             return Promise.reject('Invalid id');
         }
-        let query = 'SELECT email FROM `users` WHERE id = ? LIMIT 1'
-        let [rows, fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [id])
-            .catch((e) => { return Promise.reject(`Couldn't connect to database.`); })
-        if (rows.length < 1) {
-            return Promise.reject(`User (id:${id} does not exist.`)
-        }
-        return rows[0]['email']
+        let query = 'SELECT email FROM users WHERE user_id = $1 LIMIT 1'
+        return await db.oneOrNone(query, [id])
+            .then(row => {
+                if (!row) { return Promise.reject(`User (id:${id}) does not exist.`) }
+                return row.email
+            })
+            .catch((e) => { return Promise.reject(`${e}`); })
     }
 
-    public static async existsEmail(email: string) : Promise<boolean> {
-        await User.dbConnect()
-        let query = 'SELECT id FROM `users` WHERE email = ? LIMIT 1'
-        let [rows, fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [email])
+    public static async existsEmail(email: string): Promise<boolean> {
+        let query = 'SELECT user_id FROM users WHERE email = $1 LIMIT 1'
+        return await db.oneOrNone(query, [email])
+            .then(row => {
+                console.log(row)
+                return row
+            })
+            .then(row => { return row ? true : false })
             .catch((e) => { return Promise.reject(`Couldn't connect to database.`); })
-        if (rows.length < 1) {
-            return Promise.reject(`User (email:${email} does not exist.`)
-        }
-        return true;
     }
 
-    public static async existsAlias(alias: string) : Promise<boolean> {
-        await User.dbConnect()
-        let query = 'SELECT id FROM `users` WHERE alias = ? LIMIT 1'
-        let [rows, fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [alias])
+    public static async existsAlias(alias: string): Promise<boolean> {
+        let query = 'SELECT user_id FROM users WHERE alias = $1 LIMIT 1'
+        return await db.oneOrNone(query, [alias])
+            .then(row => { return row ? true : false })
             .catch((e) => { return Promise.reject(`Couldn't connect to database.`); })
-        if (rows.length < 1) {
-            return Promise.reject(`User (alias:${alias} does not exist.`)
-        }
-        return true;
     }
 
     /**
@@ -338,8 +357,6 @@ export class User implements IUser {
      * @param password 
      */
     public static async isValidLogin(email: string, password: string): Promise<boolean> {
-        // connect to database
-        await User.dbConnect();
         // validation
         if (!User.validateEmail(email)) {
             return Promise.reject('Invalid email.')
@@ -348,28 +365,28 @@ export class User implements IUser {
             return Promise.reject('Invalid password.')
         }
         // find user in database by email
-        let query = 'SELECT `password` FROM `users` WHERE `email` = ? LIMIT 1';
-        let [rows, fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [email])
-            .catch((e) => { /* db error */return Promise.reject(false); })
-        // reject if no match in database
-        if (rows.length < 1) {
-            return false;
-        }
-        // validate password against user's stored password hash
-        let valid: boolean = await bcrypt.compare(password, rows[0].password)
-            .catch(e => { /* bcrypt error */return Promise.reject(false); });
-        return valid;
+        let query = 'SELECT password FROM users WHERE email = $1 LIMIT 1';
+
+        return await db.oneOrNone(query, [email])
+            .then(row => {
+                // reject if no match in database
+                return row ? row : Promise.reject(false)
+            })
+            .then(row => {
+                // validate password against user's stored password hash
+                return bcrypt.compareSync(password, row.password)
+            })
+            .catch((e) => { return Promise.reject(e); })
+
     }
 
     /**
-     * Check if `email` and `password` match a user. Returns `{success:boolean, user:User}`.
-     * 
-     * @param email 
-     * @param password 
-     */
+    * Check if `email` and `password` match a user. Returns `{success:boolean, user:User}`.
+    * 
+    * @param email 
+    * @param password 
+    */
     public static async authenticate(email: string, password: string): Promise<{ 'success': boolean, 'user'?: IUser }> {
-        // connect to database
-        await User.dbConnect();
         // validation
         if (!User.validateEmail(email)) {
             return Promise.reject('Invalid email.')
@@ -378,31 +395,32 @@ export class User implements IUser {
             return Promise.reject('Invalid password.')
         }
         // find user in database by email
-        let query = 'SELECT `id`, `email`, `alias`, `password` FROM `users` WHERE `email` = ? LIMIT 1';
-        let [rows, fields] = await User.connection.execute<mysql2.RowDataPacket[]>(query, [email])
-            .catch((e) => { return Promise.reject('database error'); })
-        // reject if no match in database
-        if (rows.length < 1) {
-            return Promise.reject('No user with that email');
-        }
-        // validate password against user's stored password hash
-        let valid: boolean = await bcrypt.compare(password, rows[0].password)
-            .catch(e => { return Promise.reject('bcrypt error'); });
-
-        if (valid) {
-            return { 'success': true, 'user': { 'id': rows[0].id, 'alias': rows[0].alias, 'email': rows[0].email } }
-        } else {
-            return Promise.reject('Invalid username or password');
-        }
+        let query = 'SELECT user_id, email, alias, password FROM users WHERE email = $1 LIMIT 1';
+        return await db.one(query, [email])
+            .then(async row => {
+                // validate password against user's stored password hash
+                let valid: boolean = await bcrypt.compare(password, row.password)
+                    .catch(e => { return Promise.reject('bcrypt error'); });
+                if (valid) {
+                    return Promise.resolve({ 'success': true, 'user': { 'id': row.user_id, 'alias': row.alias, 'email': row.email } })
+                } else {
+                    return Promise.reject('Invalid username or password');
+                }
+            })
+            .catch((e) => {
+                // reject if no match in database
+                return Promise.reject('No user with that email');
+            })
     }
 
-
     private static validateId(id: number): boolean {
+        if (typeof id === 'undefined') { return false }
         if (id < 1) { return false; }
         return true; // all validation passed
     }
 
     private static validateAlias(alias: string): boolean {
+        if (typeof alias === 'undefined') { return false }
         if (alias.length < 1) { return false; }
         if (alias.length > 18) { return false; }
         let diff = User.encoder.encode(alias); // ensure no HTML entities in alias
@@ -411,6 +429,7 @@ export class User implements IUser {
     }
 
     private static validateEmail(email: string): boolean {
+        if (typeof email === 'undefined') { return false }
         if (!RegExp(/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,6})+$/g).test(email)) {
             return false;
         }
@@ -420,12 +439,14 @@ export class User implements IUser {
     }
 
     private static validatePassword(password: string): boolean {
+        if (typeof password === 'undefined') { return false }
         if (password.length < 1) { return false; }
         // bcrypt only uses first 72 charcters of password, but no reason to limit it
         return true; // all validation passed
     }
 
     private static validatePasswordHash(hash: string): boolean {
+        if (typeof hash === 'undefined') { return false }
         if (hash.length < 60 || hash.length > 60) {
             return false;
         }
@@ -433,29 +454,11 @@ export class User implements IUser {
     }
 
     private static validatePasswordSalt(salt: string): boolean {
+        if (typeof salt === 'undefined') { return false }
         if (salt.length < 29 || salt.length > 29) {
             return false;
         }
         return true;
-    }
-
-    public static async dbConnect() {
-        // console.log(`dbConnect()`)
-        if (typeof User.connection === 'undefined') {
-            try {
-                User.connection = await mysql2.createConnection(
-                    { host: "127.0.0.1", user: "root", password: "chollima", database: "users" })
-                    .then(connection => {
-                        // console.log('dbConnect(): connected @ ', new Date(Date.now()).getMilliseconds())
-                        return connection;
-                    })
-            } catch (err) {
-                console.log('dbConnect is throwing an error:', err)
-                throw err
-            }
-        } else {
-            return; // Already connected
-        }
     }
 
     public static async forgot(email: string, message: nodemailer.SendMailOptions, transporter: nodemailer.Transporter): Promise<{ 'success': boolean, 'message': string }> {
@@ -488,20 +491,9 @@ export class User implements IUser {
         let _hash = await bcrypt.hash(recovery, _salt).catch(err => { return { 'success': false, message: `Couldn't hash password.` } })
         // These should have already been taken care of in the call to setRecovery...
         const expirydate = new Date(Date.now() + 1000 * 60 * 60 * 4); // 4 hours // store the recovery key in database
-        await User.connection.execute('UPDATE `users` SET `recovery` = ?, `recoveryexpire` = ? WHERE `id` = ?', [_hash, expirydate, id])
-            .catch(err => { return { 'success': false, message: `Recovery email sent, database failure.` } })
+        await db.none('UPDATE users SET recovery = $1, recovery_expire = $2 WHERE user_id = $3', [_hash, expirydate, id])
+            .catch(err => { return { 'success': false, message: `Recovery email sent, database failure. ${err}` } })
         return { 'success': true, message: `Recovery email sent to ${message.to}. Click the link to reset your password.` }
     }
 
 }
-
-(async function () {
-    try {
-        if (typeof User.connection === 'undefined') {
-            // console.log('model/user anonymous')
-            await User.dbConnect()
-        }
-    } catch (e) {
-        // console.log('model/user anonymous error:', e)
-    }
-})()

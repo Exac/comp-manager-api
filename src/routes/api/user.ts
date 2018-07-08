@@ -4,14 +4,11 @@ import * as Entities from 'html-entities';
 import * as crypto from 'crypto';
 import * as nodemailer from 'nodemailer';
 import { User } from '../../model/user';
-import { Connection } from 'mysql2/promise';
 
 /**
  * SETTINGS
  */
 const router = express.Router();
-const db = { host: "127.0.0.1", user: "root", password: "chollima", database: "users" };
-// const sessionStore = new MySQLStore(db);
 const jsonParser = bodyParser.json(); // for parsing POST/PUT/DELETE json requests
 const urlEncodedParser = bodyParser.urlencoded({ extended: false }); // and parsing normal form requests
 let encoder = new Entities.AllHtmlEntities();
@@ -22,27 +19,13 @@ const transporter = nodemailer.createTransport({
         pass: encoder.decode('&#100;&#99;&#50;&#52;&#50;&#50;&#57;&#48;&#55;&#54;&#49;&#56;&#102;&#100;&#99;&#98;&#57;&#57;&#97;&#49;&#53;&#50;&#55;&#49;&#98;&#50;&#102;&#53;&#55;&#97;&#49;&#57;')
     }
 });
-// get a mysql connection from User
-let connection: Connection;
-(async function () {
-    try {
-        if (typeof User.connection === 'undefined') {
-            // console.log('api/user')
-            User.connection = <Connection>{};
-            await User.dbConnect()
-                .then(res => { connection = User.connection })
-        }
-    } catch (e) {
-        console.log('/router/api/user async anonymous error:', e)
-    }
-})()
 
 /**
  * ROUTES FOR /api/user/*
  */
 router.post('/', jsonParser, async function (req, res) {
     // remove HTML chars from alias
-    req.body.alias = new Entities.AllHtmlEntities().encode(req.body.alias);
+    req.body.alias = new Entities.AllHtmlEntities().encode(req.body.alias); // TODO: ensure the resulting alias isn't already in the db
     // create user
     await User.set(req.body.alias, req.body.email, req.body.password)
         .catch(err => {
@@ -71,16 +54,14 @@ router.get('/email/:userid', async function (req, res) {
 
 router.get('/email/:email/exists', async function (req, res) {
     await User.existsEmail(req.params.email)
-        .then(result => { return res.send(true) })
+        .then(result => { return res.send(result) })
         .catch(error => { return res.send(false) })
-    return res.send(false)
 });
 
 router.get('/alias/:alias/exists', async function (req, res) {
     await User.existsAlias(req.params.alias)
-        .then(result => { return res.send(true) })
+        .then(result => { return res.send(result) })
         .catch(error => { return res.send(false) })
-    return res.send(false)
 });
 
 router.put('/password/', jsonParser, async function (req, res, next) {
@@ -89,7 +70,7 @@ router.put('/password/', jsonParser, async function (req, res, next) {
     user.id = req.body.id;
     if (typeof req.body.recovery !== 'undefined') {
         // user is submitting recovery code alongside password
-        let valid = await user.isValidRecovery(req.body.id, req.body.recovery)
+        let valid = await user.isValidRecovery(req.body.recovery, req.body.id)
             .catch(err => {
                 return (res.headersSent) ? null : res.json({ 'success': false })
             })

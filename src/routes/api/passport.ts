@@ -1,16 +1,12 @@
 import * as express from 'express';
 import * as bodyParser from 'body-parser';
-import * as session from 'express-session';
 import { User } from '../../model/user';
 import * as passport from 'passport';
-const MySQLStore = require('express-mysql-session')(session)
 
 /**
  * SETTINGS
  */
 const router = express.Router();
-const db = { host: "127.0.0.1", user: "root", password: "chollima", database: "users" };
-const sessionStore = new MySQLStore(db);
 const jsonParser = bodyParser.json(); // for parsing POST/PUT/DELETE json requests
 const urlEncodedParser = bodyParser.urlencoded({ extended: false }); // & parsing form requests
 
