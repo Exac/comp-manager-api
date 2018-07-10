@@ -1,19 +1,34 @@
-import * as express from 'express'; // CRUD => .post, .get, .put, .delete
+import 'dotenv/config'; // use .env file's variables if in production
+import * as tslib from 'tslib'
+import * as express from 'express';
 import * as bodyParser from 'body-parser';
 import * as cookieParser from 'cookie-parser';
 import * as cors from 'cors';
 import * as morgan from 'morgan';
-import { User } from './model/user';
 import * as session from 'express-session';
 import * as co from 'co'
-import { v4 as uuid } from 'uuid';
 import * as passport from 'passport'
-import connectPgSimple = require('connect-pg-simple');
 import * as pg from 'pg';
+import { User } from './model/user';
+import { IUser } from './model/Iuser';
+import { v4 as uuid } from 'uuid';
 import db from './model/db';
-let LocalStrategy = require('passport-local').Strategy;
+import connectPgSimple = require('connect-pg-simple');
 
+export const app = express();
+
+let LocalStrategy = require('passport-local').Strategy;
 !(async function () {
+  /**
+   * TEMPORARY
+   */
+  let u: User = new User();
+  u.id = 4
+  await u.getRecovery()
+    .then(res => {console.log('r:',res)})
+    .catch(e => {console.error('e:',e)})
+  // await u.setEmail('contact@thomasmclennan.ca').catch(err => {console.log(err)})
+
   /**
    * PASSPORT
    */
@@ -78,13 +93,6 @@ let LocalStrategy = require('passport-local').Strategy;
     })
   });
 
-  function ensureLoggedIn(req, res, next) {
-    if (req.isAuthenticated()) {
-      return next();
-    }
-    res.redirect("/not-logged-in");
-  }
-
   passport.use(localStrategy);
 
   /**
@@ -93,23 +101,27 @@ let LocalStrategy = require('passport-local').Strategy;
 
   let isProduction = process.env.NODE_ENV === 'production';
 
-  const PORT: number = 8081; // https://stackoverflow.com/questions/44344793/how-to-run-node-express-server-and-angular-on-the-same-port
-  const IP: string = '0.0.0.0';
-  const app = express();
+  const PORT: number = isProduction ? parseInt(process.env.PORT || "8081") : 8081;
+  const IP: string = isProduction ? process.env.IP|| '0.0.0.0' : '0.0.0.0';
+ 
 
   // PostgreSQL
   const pgSession = connectPgSimple(session);
-  const pgConfig: pg.ClientConfig = {
+  const pgConfig: pg.ClientConfig = process.env.NODE_ENV !== 'production' ? {
     host: 'localhost',
     port: 5432,
     database: 'chollima',
     user: 'chollima',
     password: 'chollima'
-  }
+  } : {
+      host: process.env.PGHOST,
+      port: parseInt(process.env.PGPORT || '5432'),
+      database: process.env.PGDATABASE,
+      user: process.env.PGUSER,
+      password: process.env.PGPASSWORD,
+    }
   const pgClient = new pg.Client(pgConfig)
   const pgSessionStore: session.Store = new pgSession()
-
-
 
   // Init body parsing middleware
   const jsonParser = bodyParser.json(); // for parsing POST/PUT/DELETE json requests
@@ -117,7 +129,12 @@ let LocalStrategy = require('passport-local').Strategy;
 
   // Cross-domain access
   // TODO: only allow during development
-  let originsWhitelist = ['http://192.168.1.6:4200', 'http://localhost:4200', 'http://0.0.0.0:4200', 'http://127.0.0.1:4200'];
+  let originsWhitelist = [
+    'http://192.168.1.6:4200',
+    'http://localhost:4200',
+    'http://0.0.0.0:4200',
+    'http://127.0.0.1:4200'
+  ];
   let corsOptions = {
     origin: function (origin, callback) {
       let isWhitelisted = originsWhitelist.indexOf(origin) !== -1;
@@ -160,11 +177,13 @@ let LocalStrategy = require('passport-local').Strategy;
     genid: function (req) {
       return uuid();
     },
-    secret: 'bbzgbxjktgfeacwmsycpquyxovfukhsg', // secret used to generate hash
+    secret: process.env.NODE_ENV === 'production' // secret used to generate hash
+      ? process.env.SESSION_SECRET || 'bbzgbxjktgfeacwmsycpquyxovfukhsg'
+      : 'bbzgbxjktgfeacwmsycpquyxovfukhsg',
     store: pgSessionStore,
     resave: false,
     saveUninitialized: true,
-    cookie: { maxAge: 1 * 1 * 4 * 60 * 1000 } // 4 minutes
+    cookie: { maxAge: 1 * 13 * 60 * 60 * 1000 } // 13 hours
   }))
 
   app.use(cookieParser()); // passport won't work without this ?
@@ -185,3 +204,5 @@ let LocalStrategy = require('passport-local').Strategy;
   });
 
 })();
+
+export default app

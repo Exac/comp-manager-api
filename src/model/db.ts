@@ -26,7 +26,7 @@ const pgp: IMain = pgPromise({
  * PostgreSQL Database
  * 
  * @usage `import db from './model/db'`
- * @usage `db.any('SELECT * FROM users WHERE recovery_expire < $1 AND user_id = $2', [new Date(), 1])`
+ * @usage `db.any('SELECT * FROM users WHERE recovery_expire < $1 AND user_id = $2', [dateX, 1])`
  */
 export const db: IDatabase<any> = pgp(cn)
 
