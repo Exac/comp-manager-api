@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import * as rewire from 'rewire'
+const rewire = require('rewire')
 
 let dbModel = rewire('./passport')
 

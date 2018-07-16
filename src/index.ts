@@ -1,40 +1,33 @@
 import 'dotenv/config'; // use .env file's variables if in production
-import * as tslib from 'tslib'
 import * as express from 'express';
 import * as bodyParser from 'body-parser';
-import * as cookieParser from 'cookie-parser';
+// import * as cookieParser from 'cookie-parser';
 import * as cors from 'cors';
 import * as morgan from 'morgan';
 import * as session from 'express-session';
-import * as co from 'co'
+// import * as co from 'co'
 import * as passport from 'passport'
 import * as pg from 'pg';
 import { User } from './model/user';
 import { IUser } from './model/Iuser';
 import { v4 as uuid } from 'uuid';
 import db from './model/db';
-import connectPgSimple = require('connect-pg-simple');
+// import connectPgSimple = require('connect-pg-simple');
+import Competition from './model/comp/Competition';
+const connectPgSimple = require('connect-pg-simple');
+const cookieParser = require('cookie-parser')
+const co = require('co')
 
-export const app = express();
+export const app: express.Application = express();
 
 let LocalStrategy = require('passport-local').Strategy;
 !(async function () {
-  /**
-   * TEMPORARY
-   */
-  let u: User = new User();
-  u.id = 4
-  await u.getRecovery()
-    .then(res => {console.log('r:',res)})
-    .catch(e => {console.error('e:',e)})
-  // await u.setEmail('contact@thomasmclennan.ca').catch(err => {console.log(err)})
-
   /**
    * PASSPORT
    */
   let localStrategy = new LocalStrategy(
     { usernameField: 'email', session: false, passReqToCallback: true },
-    function (req, username, password, done) {
+    function (req: Request, username: string, password: string, done: any) {
       return co(function* () {
         // console.log(`LocalStrategy() -> reqCo=${req.isAuthenticated()}`)
         try {
@@ -58,7 +51,7 @@ let LocalStrategy = require('passport-local').Strategy;
 
   localStrategy = new LocalStrategy(
     { usernameField: 'email', session: false, passReqToCallback: true },
-    function (req, username, password, done) {
+    function (req: Request, username: string, password: string, done: any) {
       return co(function* () {
         try {
           let result: any = yield Promise.resolve(User.authenticate(username, password));
@@ -100,20 +93,24 @@ let LocalStrategy = require('passport-local').Strategy;
    */
 
   let isProduction = process.env.NODE_ENV === 'production';
+  let isTest = process.env.NODE_ENV === 'testing';
 
-  const PORT: number = isProduction ? parseInt(process.env.PORT || "8081") : 8081;
-  const IP: string = isProduction ? process.env.IP|| '0.0.0.0' : '0.0.0.0';
- 
+  // If we're testing one the same machine that we're developing on,
+  // we need to run both processes on different ports
+  const PORT: number = isProduction ? parseInt(process.env.PORT || "8081") : isTest ? 8082 : 8081
+  const IP: string = isProduction ? process.env.IP || '0.0.0.0' : '0.0.0.0';
 
   // PostgreSQL
   const pgSession = connectPgSimple(session);
-  const pgConfig: pg.ClientConfig = process.env.NODE_ENV !== 'production' ? {
-    host: 'localhost',
-    port: 5432,
-    database: 'chollima',
-    user: 'chollima',
-    password: 'chollima'
-  } : {
+  const pgConfig: pg.ClientConfig = process.env.NODE_ENV !== 'production'
+    ? {
+      host: 'localhost',
+      port: 5432,
+      database: 'chollima',
+      user: 'chollima',
+      password: 'chollima'
+    }
+    : {
       host: process.env.PGHOST,
       port: parseInt(process.env.PGPORT || '5432'),
       database: process.env.PGDATABASE,
@@ -136,7 +133,7 @@ let LocalStrategy = require('passport-local').Strategy;
     'http://127.0.0.1:4200'
   ];
   let corsOptions = {
-    origin: function (origin, callback) {
+    origin: function (origin: any, callback: any) {
       let isWhitelisted = originsWhitelist.indexOf(origin) !== -1;
       callback(null, isWhitelisted);
     },

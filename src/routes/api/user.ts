@@ -3,8 +3,11 @@ import * as bodyParser from 'body-parser';
 import * as Entities from 'html-entities';
 import * as crypto from 'crypto';
 import * as nodemailer from 'nodemailer';
+import SMTPTransport = require('nodemailer/lib/smtp-transport')
 import { User } from '../../model/user';
 import { ensureLoggedIn } from '../../model/passport';
+
+
 /**
  * SETTINGS
  */
@@ -12,13 +15,16 @@ const router = express.Router();
 const jsonParser = bodyParser.json(); // for parsing POST/PUT/DELETE json requests
 const urlEncodedParser = bodyParser.urlencoded({ extended: false }); // and parsing normal form requests
 let encoder = new Entities.AllHtmlEntities();
-const transporter = nodemailer.createTransport({
+const user: string = process.env.NODE_ENV === 'production' ? process.env.NM_TRANS_EMAIL! : 'chollima.server@gmail.com';
+const pass: string = process.env.NODE_ENV === 'production' ? process.env.NM_TRANS_PASS! : encoder.decode('&#100;&#99;&#50;&#52;&#50;&#50;&#57;&#48;&#55;&#54;&#49;&#56;&#102;&#100;&#99;&#98;&#57;&#57;&#97;&#49;&#53;&#50;&#55;&#49;&#98;&#50;&#102;&#53;&#55;&#97;&#49;&#57;');
+
+const transporter: nodemailer.Transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-        user: process.env.NODE_ENV !== 'production' ? process.env.NM_TRANS_EMAIL : 'chollima.server@gmail.com',
-        pass: process.env.NODE_ENV !== 'production' ? process.env.NM_TRANS_PASS : encoder.decode('&#100;&#99;&#50;&#52;&#50;&#50;&#57;&#48;&#55;&#54;&#49;&#56;&#102;&#100;&#99;&#98;&#57;&#57;&#97;&#49;&#53;&#50;&#55;&#49;&#98;&#50;&#102;&#53;&#55;&#97;&#49;&#57;')
+        'user': user,
+        'pass': pass
     }
-});
+})
 
 /**
  * ROUTES FOR /api/user/*
@@ -158,8 +164,8 @@ router.post('/login/', jsonParser, async function (req, res) {
             .catch(err => { return (res.headersSent) ? null : res.json({ 'success': false }) })
         let alias = await User.getAlias(parseInt(id!.toString()))
             .catch(err => { return (res.headersSent) ? null : res.json({ 'success': false }) })
-        if (!req!.session!.data) req!.session!.data = {};
-        if (!req!.session!.data.user) req!.session!.data.user = {};
+        if (!req.session!.data!) req!.session!.data = {};
+        if (!req.session!.data.user!) req!.session!.data.user = {};
         req!.session!.data.user = {
             'id': await User.getId(req.body.email),
             'alias': alias,
@@ -194,8 +200,8 @@ router.post('/forgot/', async function (req, res) {
     await user.setRecovery(recovery)
         .then((result: boolean) => { })
         .catch(err => { return { 'success': false, 'message': err } })
-    const message = {
-        from: transporter.options["auth"].user,
+    const message: {} = {
+        from: user,
         to: req.body.email,
         subject: `Chollima password reset requested.`,
         text: `Hello, this is an automated message from Chollima.\n`

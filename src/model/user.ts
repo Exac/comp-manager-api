@@ -12,13 +12,13 @@ import db from './db'
  */
 export class User implements IUser {
     /** User's id number. `user_id` in database. */
-    public id: number;
+    public id: number = 0
 
     /** User's alias. Name or nickname. 1-18 chars. */
-    public alias: string;
+    public alias: string = ''
 
     /** User's email. */
-    public email: string;
+    public email: string = ''
 
     private static encoder: AllHtmlEntities = new Entities.AllHtmlEntities();
 

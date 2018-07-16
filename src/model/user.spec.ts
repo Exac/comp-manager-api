@@ -1,6 +1,6 @@
 import { expect, should } from 'chai'
-import * as rewire from 'rewire'
-import { User } from './User'
+import { User } from './user'
+const rewire = require('rewire')
 
 let U = rewire('./user')
 
@@ -8,11 +8,11 @@ let encoder = U.__get__('User.encoder')
 
 describe("User", () => {
     describe("#id, #email, #alias", () => {
-        it('initialized undefined', () => {
+        it('initialized to defaults', () => {
             let user = new User();
-            expect(user.id).to.be.an('undefined')
-            expect(user.email).to.be.an('undefined')
-            expect(user.alias).to.be.an('undefined')
+            expect(user.id).to.equal(0)
+            expect(user.email).to.equal('')
+            expect(user.alias).to.equal('')
         })
         it('can be instansiated', () => {
             let user = new User(100, 'email@example.com', 'Thomas');

@@ -4,7 +4,7 @@ import * as pgPromise from 'pg-promise';
 // Connect to postgres and export the database for use
 
 // connection options,
-let cn: any = process.env.NODE_ENV !== 'production' ? {
+export let cn: any = process.env.NODE_ENV !== 'production' ? {
     host: 'localhost',
     port: 5432,
     database: 'chollima',
@@ -18,7 +18,7 @@ let cn: any = process.env.NODE_ENV !== 'production' ? {
     password: process.env.PGPASSWORD,
 }
 
-const pgp: IMain = pgPromise({
+export const pgp: IMain = pgPromise({
     // initialization options
 });
 

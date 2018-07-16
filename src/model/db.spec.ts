@@ -1,11 +1,5 @@
 import { expect } from 'chai'
-import { db } from './db'
-import * as rewire from 'rewire'
-
-let dbModel = rewire('./db')
-
-let cn = dbModel.__get__('cn')
-let pgp = dbModel.__get__('pgp')
+import { db, cn, pgp } from './db'
 
 describe("db - database connection", () => {
     describe("cn - connection options", () => {
