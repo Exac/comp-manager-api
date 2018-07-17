@@ -147,7 +147,7 @@ router.get('/logout', async function (req, res) {
  * @param req.body.password User's password attempt
  * @returns `{ success: boolean }`
  */
-router.post('/login/', jsonParser, async function (req, res) {
+router.post('/login/', jsonParser, async function (req: any, res) {
     // TODO: Limit login attempts if user is brute-forcing
     // user wants to login
     let valid = await User.isValidLogin(req.body.email, req.body.password)
@@ -164,9 +164,9 @@ router.post('/login/', jsonParser, async function (req, res) {
             .catch(err => { return (res.headersSent) ? null : res.json({ 'success': false }) })
         let alias = await User.getAlias(parseInt(id!.toString()))
             .catch(err => { return (res.headersSent) ? null : res.json({ 'success': false }) })
-        if (!req.session!.data!) req!.session!.data = {};
-        if (!req.session!.data.user!) req!.session!.data.user = {};
-        req!.session!.data.user = {
+        if (!req.session.data) req.session.data = {};
+        if (!req.session.data.user) req!.session!.data.user = {};
+        req.session.data.user = {
             'id': await User.getId(req.body.email),
             'alias': alias,
             'email': req.body.email
@@ -182,12 +182,12 @@ router.post('/login/', jsonParser, async function (req, res) {
  * @param req.body.email
  * @returns `{ success:boolean, message:string }`
  */
-router.post('/forgot/', async function (req, res) {
+router.post('/forgot/', jsonParser, async function (req: express.Request, res) {
     // to send an account recovery email...
     // validate request
     let user: User = new User();
     let email: string = req.body.email;
-    if (email === 'undefined') {
+    if (typeof email === 'undefined') {
         return (res.headersSent)
             ? null
             : res.json({ success: false, message: `Error: Missing email account.` })

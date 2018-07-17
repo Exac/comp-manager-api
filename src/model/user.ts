@@ -411,7 +411,6 @@ export class User implements IUser {
         }
         // find id in database
         let query = 'SELECT user_id FROM users WHERE email = $1 LIMIT 1';
-        let id: number;
         return await db.oneOrNone(query, email)
             .then(row => {
                 // reject if results empty
@@ -645,7 +644,8 @@ export class User implements IUser {
     public static async forgot(
         email: string,
         message: nodemailer.SendMailOptions,
-        transporter: nodemailer.Transporter): Promise<{ 'success': boolean, 'message': string }> {
+        transporter: nodemailer.Transporter
+    ): Promise<{ 'success': boolean, 'message': string }> {
         // get user id
         let user: User = new User(); // needed for non-static functions
         let id: number = 0

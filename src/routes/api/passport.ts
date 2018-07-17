@@ -2,6 +2,7 @@ import * as express from 'express';
 import * as bodyParser from 'body-parser';
 import { User } from '../../model/user';
 import * as passport from 'passport';
+import { MySession } from '../../types/middleware';
 
 /**
  * SETTINGS
@@ -42,10 +43,11 @@ router.all('/logout', function (req, res) {
  * Check if host is logged in as a user.
  * @returns `{success: boolean, user: { id:number, alias:string, email:string }}`
  */
-router.post('/isloggedin/', jsonParser, async function (req, res) {
+router.post('/isloggedin/', jsonParser, async function (req: any, res) {
   if (req.isAuthenticated()) {
-    let user = await User.get(req!.session!.passport.user)
-      .then(u => {return u})
+    // if (req.session == undefined ) return res.json({ 'success': false })
+    let user = await User.get(req.session.passport.user)
+      .then(u => { return u.toString() })
       .catch(error => { return res.json({ 'success': false }) });
     return res.json({ 'success': true, 'user': user })
   }
@@ -63,9 +65,9 @@ router.get('/login/failure', jsonParser, function (req, res) {
 /**
  * @returns `{success: boolean, user: { id:number, alias:string, email:string }}`
  */
-router.get('/login/success', jsonParser, async function (req, res) {
+router.get('/login/success', jsonParser, async function (req: any, res) {
   console.log(`/api/passport/login/success req.session=${JSON.stringify(req.session)}`)
-  res.json({ 'success': true, 'user': await User.get(req!.session!.passport.user) })
+  res.json({ 'success': true, 'user': await User.get(req.session!.passport.user) })
 })
 
 module.exports = router;

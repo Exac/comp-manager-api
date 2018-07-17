@@ -9,7 +9,7 @@ import * as express from 'express'
  * @example `import { ensureLoggedIn } from 'model/passport';`
  * @example `app.get('/profile', ensureLoggedIn, (req, res) => {res.write("juice user data")})`
  */
-export function ensureLoggedIn(req: express.Request, res: express.Response, next: any) {
+export function ensureLoggedIn(req: Express.Request, res: express.Response, next: any) {
     if (req.isAuthenticated()) {
         return next()
     }
