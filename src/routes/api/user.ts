@@ -162,7 +162,8 @@ router.post('/login/', jsonParser, async function (req: any, res) {
         let id = await User.getId(req.body.email)
             .then(res => { return res })
             .catch(err => { return (res.headersSent) ? null : res.json({ 'success': false }) })
-        let alias = await User.getAlias(parseInt(id!.toString()))
+        if(typeof id !== 'number') return (res.headersSent) ? null : res.json({ 'success': false })
+            let alias = await User.getAlias(id)
             .catch(err => { return (res.headersSent) ? null : res.json({ 'success': false }) })
         if (!req.session.data) req.session.data = {};
         if (!req.session.data.user) req!.session!.data.user = {};

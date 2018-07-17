@@ -2,18 +2,17 @@ import * as express from 'express';
 import * as bodyParser from 'body-parser';
 import { User } from '../../model/user';
 import * as passport from 'passport';
-import { MySession } from '../../types/middleware';
+
+// SETTINGS
 
 /**
- * SETTINGS
+ * ROUTES FOR `/api/passport/*`
  */
 const router = express.Router();
 const jsonParser = bodyParser.json(); // for parsing POST/PUT/DELETE json requests
 const urlEncodedParser = bodyParser.urlencoded({ extended: false }); // & parsing form requests
 
-/**
- * ROUTES FOR /api/passport/*
- */
+
 
 /**
  * Check if supplied `HttpParams` `email`, and `password` match a user. 
@@ -67,7 +66,12 @@ router.get('/login/failure', jsonParser, function (req, res) {
  */
 router.get('/login/success', jsonParser, async function (req: any, res) {
   console.log(`/api/passport/login/success req.session=${JSON.stringify(req.session)}`)
-  res.json({ 'success': true, 'user': await User.get(req.session!.passport.user) })
+  if (typeof req.session.passport === 'undefined' || typeof req.session.passport.user === 'undefined') { 
+    res.json({ 'success': false })
+    return
+}
+  let user = await User.get(req.session.passport.user)
+  res.json({ 'success': true, 'user': user })
 })
 
 module.exports = router;
