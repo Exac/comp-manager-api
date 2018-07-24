@@ -168,7 +168,7 @@ let LocalStrategy = require('passport-local').Strategy;
   });
 
   // Session config
-  // TODO: session secret should be an array of two secrets, and they should be taken from
+  // Session secret should be an array of two secrets, and they should be taken from
   // Environmental variables and rotated around every few days in production
   app.use(session({
     genid: function (req) {

@@ -1,10 +1,18 @@
 import { expect, should } from 'chai'
 import { User } from './user'
+import { IUser } from './Iuser'
 const rewire = require('rewire')
 
 let U = rewire('./user')
 
 let encoder = U.__get__('User.encoder')
+
+describe("IUser", () => {
+    it("Can be used as a type", () => {
+        let u: IUser
+        u = new User()
+    })
+})
 
 describe("User", () => {
     describe("#id, #email, #alias", () => {

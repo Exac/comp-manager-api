@@ -196,11 +196,7 @@ export class User implements IUser {
         // check if email already exists in database
         let query = "SELECT user_id, email FROM users WHERE email = $1";
         await db.none(query, email)
-            .then( /*(rows) => {
-                if (rows.length > 0) { // TODO: this will never be called? 
-                    return Promise.reject(`A user already has email: ${email}`)
-                }
-            } */ )
+            .then()
             .catch(err => {
                 return Promise.reject(`A user already has email: ${email}. Error: ${err}`)
             })

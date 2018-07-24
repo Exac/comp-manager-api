@@ -2,15 +2,15 @@ import Record from './Record'
 
 export default class Race {
 
-    public race_id: number = 0
-    public records: Record[] = []
-    public distance_name: string = ''
-    public distance: number = 0
-    public track: string = ''
-    public type: string = ''
-    public x_race: number = 0
-    public y_round: number = 0
-    public z_group: number = 0
+    public race_id: number
+    public records: Record[]
+    public distance_name: string
+    public distance: number
+    public track: string
+    public type: string
+    public x_race: number
+    public y_round: number
+    public z_group: number
 
     constructor(
         race_id?: number,

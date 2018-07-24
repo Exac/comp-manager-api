@@ -1,9 +1,7 @@
 import { expect } from 'chai'
 import Competition from './Competition';
 import { User } from '../user';
-import DivisionState from './DivisionState';
 import * as _ from 'lodash'
-import { json } from 'express';
 import Division from './Division';
 
 describe(`Competition`, () => {

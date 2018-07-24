@@ -6,9 +6,11 @@
         "strict": true,
         "noImplicitReturns": true,
         "noImplicitThis": true,
+        // "noImplicitAny": true,
         "strictNullChecks": true,
         "strictFunctionTypes": true,
         "importHelpers": true,
+        // "experimentalDecorators": true,
         "types": [
             "node",
             "mocha",

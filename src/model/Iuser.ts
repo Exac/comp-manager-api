@@ -7,5 +7,3 @@ export interface IUser {
     alias: string;
     email: string;
 }
-
-export default IUser

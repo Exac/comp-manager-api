@@ -2,6 +2,7 @@ import * as express from 'express';
 import * as bodyParser from 'body-parser';
 import { User } from '../../model/user';
 import * as passport from 'passport';
+import * as _ from 'lodash';
 
 // SETTINGS
 
@@ -66,10 +67,10 @@ router.get('/login/failure', jsonParser, function (req, res) {
  */
 router.get('/login/success', jsonParser, async function (req: any, res) {
   console.log(`/api/passport/login/success req.session=${JSON.stringify(req.session)}`)
-  if (typeof req.session.passport === 'undefined' || typeof req.session.passport.user === 'undefined') { 
+  if (!_.has(req, 'session.passport.user')) {
     res.json({ 'success': false })
     return
-}
+  }
   let user = await User.get(req.session.passport.user)
   res.json({ 'success': true, 'user': user })
 })

@@ -1,9 +1,9 @@
 
 export default class Protocol {
     public protocol_id: number
-    public protocol: string = ''
-    public is_custom: boolean = false
-    public json: object = {}
+    public protocol: string
+    public is_custom: boolean
+    public json: object
 
     public constructor(
         protocol_id?: number,

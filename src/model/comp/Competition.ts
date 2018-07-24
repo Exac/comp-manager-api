@@ -1,9 +1,6 @@
 import { User } from '../user';
-import DivisionState from './DivisionState';
 import Registration from './Registration';
 import Protocol from './Protocol';
-import * as _ from 'lodash';
-import { join } from 'path';
 import Division from './Division';
 
 
