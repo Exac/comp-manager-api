@@ -35,7 +35,9 @@
     "pg": "^7.4.3",
     "pg-promise": "^8.4.5",
     "pg-validate": "^1.0.0",
+    "reflect-metadata": "^0.1.12",
     "tslib": "^1.9.3",
+    "typeorm": "^0.2.7",
     "uuid": "^3.2.1"
   },
   "devDependencies": {

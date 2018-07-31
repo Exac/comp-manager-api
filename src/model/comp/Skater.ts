@@ -1,5 +1,4 @@
-import { Sex } from './Sex.enum';
-
+import { Sex } from '../../Sex.enum';
 
 export default class Skater {
 

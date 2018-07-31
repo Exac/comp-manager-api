@@ -1,4 +1,4 @@
-import { Sex } from './Sex.enum';
+import { Sex } from '../../Sex.enum';
 
 export default interface ISkater {
 

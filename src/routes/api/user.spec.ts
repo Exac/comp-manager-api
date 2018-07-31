@@ -1,7 +1,7 @@
 import { expect, should } from 'chai'
 import * as sinon from 'sinon'
 import * as supertest from 'supertest'
-import { app } from '../../index'
+import { app } from '../..'
 
 describe('ROUTES /api/user/', () => {
 

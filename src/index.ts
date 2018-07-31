@@ -1,4 +1,5 @@
 import 'dotenv/config'; // use .env file's variables if in production
+import 'reflect-metadata'; // typeorm dependancy
 import * as express from 'express';
 import * as bodyParser from 'body-parser';
 // import * as cookieParser from 'cookie-parser';
